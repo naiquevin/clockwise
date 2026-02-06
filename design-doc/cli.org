@@ -1,0 +1,101 @@
+#+title: Command line interface
+
+* What the command does?
+  Given a time duration and one or many org files, it aggregates the
+  clock entries in the org files and outputs the total time spent in
+  that duration. There are a bunch of options to control the output.
+
+* Positional args
+  path to org file (at least one or many): All org clock entries
+  in these files will be considered.
+** Path to org file
+   - At least one path is required
+   - Absolute and relative paths should work
+   - Should be able to resolve ~/ to home directory
+
+* Options
+** The time duration option
+   - The ~-t~ or ~--time~ option
+   - This option will indicate the time duration e.g. a day, a week,
+     month, quarter or a year.
+*** Examples
+    - ~d~ means today. This will also be the default value
+    - ~d-{n}~ means n days before today
+      + Note that the hyphen after d is actually the minus sign
+      + ~d-1~ means yesterday
+      + ~d-5~ means 5 days before today
+    - ~w~ means this week
+    - ~w-{n}~ means n weeks before current
+      + Note that the hyphen after d is actually the minus sign
+    - ~w6~ means 6th week of the year
+      + Note the syntax is different from ~d-{n}~, there's no hyphen
+        here.
+    - ~m~ means current month
+    - ~m-{n}~ means n months before today
+      + ~m-1~ means last month
+    - ~mon~ means Monday, ~tue~ means Tuesday of current week etc.
+    - ~mon-1~ means last Monday, ~tue-1~ for last tuesday etc.
+    - ~jan~ means january, ~feb~ for February etc.
+    - ~q{n}~ means nth quarter of the year e.g. ~q1~, ~q2~ etc
+      + Note the syntax is different from ~d-{n}~, there's no hyphen
+        here.
+    - Absolute dates are also accepted
+      + 2026-02-05
+      + 2026-01 (jan of 2026)
+      + 2025-01 (jan of 2025)
+    - Absolute range is also accepted
+      + 2025-07-01..2025-07-20 (end date excluded)
+      + 2025-07-01..=2025-07-20 (end date included)
+      + short forms are also accepted in ranges e.g. ~mon..wed~
+      + Ranges can span across years
+      + start value later than the end value is an error
+*** Assumptions
+    - Unless year is specified as part of absolute date or range, the
+      year is inferred as follows,
+      + Find the duration based on the argument e.g. suppose it's
+        ~may~
+      + Now if current month of this year is Feb, it means it's the
+        last May
+      + But if the duration happens to be ~jan~, it means this year's
+        Jan
+      + Edge case: If the current month is Dec, ~jan~ means the Jan
+        of the same year (not the next year as it's in the future so
+        there's no chance to have org clock entries for it)
+      + Same logic applies to other values too
+    - The smallest duration is a day. Hourly breakdown is not needed.
+    - Consider local time zone
+** Time window
+   - The ~-w~ or ~--window~ option
+   - It's default value depends on the time duration
+     + E.g. if time duration arg represents a day, the default window
+       corresponds to one day
+   - Valid window values: d (day), w (week), m (month), q (quarter)
+   - User may specify a smaller window than what the time duration
+     represents, in which case, multiple lines are printed in the
+     output breaking down the total time in those windows
+     + E.g. #1 suppose time duration is ~w~ i.e. current week, then
+       window can be specified as ~d~ in which case, it shows total
+       time clocked in per day or the week.
+   - If the window is larger than the duration, it disregards the
+     window and show the output (as if window was not specified) but
+     show a warning
+
+
+* Examples
+  #+begin_src bash
+    # Yesterday's time
+    clockwise ~/notes.org --time d-1
+
+    # This week broken down by day
+    clockwise ~/work.org --time w --window d
+
+    # January through March
+    clockwise ~/2025.org --time jan..=mar
+
+    # Last Monday to Friday
+    clockwise ~/weekly.org --time mon-1..=fri-1
+  #+end_src
+
+* Improvements for future (no need to implement right now)
+  - Multiple output formats
+  - Filtering of org entries by tags etc.
