@@ -1,0 +1,11 @@
+#+title: Code Guidelines
+
+* Code Organization
+  - Start with simple code in main.rs
+  - Move code to its own module only when it evolves to have significant
+    complexity (many methods, large implementation, etc.)
+  - Example: TimeDuration has its own module because there's a fair
+    amount of code in it. Breakdown stays in main.rs since it's
+    simple. If Breakdown evolves in the future to have many methods,
+    then it can be moved into its own module.
+  - Refactor when needed, not preemptively
