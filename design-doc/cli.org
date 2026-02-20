@@ -1,9 +1,8 @@
 #+title: Command line interface
 
 * What the command does?
-  Given a time duration and one or many org files, it aggregates the
-  clock entries in the org files and outputs the total time spent in
-  that duration. There are a bunch of options to control the output.
+  The [[file:about.org][about.org]] file explains the purpose. There are a bunch of
+  options to control the output.
 
 * Positional args
   path to org file (at least one or many): All org clock entries
@@ -64,20 +63,20 @@
       + Same logic applies to other values too
     - The smallest duration is a day. Hourly breakdown is not needed.
     - Consider local time zone
-** Time window
-   - The ~-w~ or ~--window~ option
+** Breakdown
+   - The ~-b~ or ~--breakdown~ option
    - It's default value depends on the time duration
-     + E.g. if time duration arg represents a day, the default window
+     + E.g. if time duration arg represents a day, the default breakdown
        corresponds to one day
-   - Valid window values: d (day), w (week), m (month), q (quarter)
-   - User may specify a smaller window than what the time duration
+   - Valid breakdown values: d (day), w (week), m (month), q (quarter)
+   - User may specify a smaller breakdown than what the time duration
      represents, in which case, multiple lines are printed in the
-     output breaking down the total time in those windows
+     output breaking down the total time in those periods
      + E.g. #1 suppose time duration is ~w~ i.e. current week, then
-       window can be specified as ~d~ in which case, it shows total
-       time clocked in per day or the week.
-   - If the window is larger than the duration, it disregards the
-     window and show the output (as if window was not specified) but
+       breakdown can be specified as ~d~ in which case, it shows total
+       time clocked in per day of the week.
+   - If the breakdown is larger than the duration, it disregards the
+     breakdown and show the output (as if breakdown was not specified) but
      show a warning
 
 
@@ -87,7 +86,7 @@
     clockwise ~/notes.org --time d-1
 
     # This week broken down by day
-    clockwise ~/work.org --time w --window d
+    clockwise ~/work.org --time w --breakdown d
 
     # January through March
     clockwise ~/2025.org --time jan..=mar
