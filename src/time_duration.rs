@@ -1,13 +1,24 @@
-use chrono::{Datelike, Local, NaiveDate, Weekday};
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, TimeDelta, Weekday};
+
+pub struct TimeDuration(TimeDelta);
+
+impl std::fmt::Display for TimeDuration {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let total_minutes = self.0.num_minutes();
+        let hours = total_minutes / 60;
+        let minutes = total_minutes % 60;
+        write!(f, "{hours:02}:{minutes:02}")
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DateRange {
-    pub start: NaiveDate,
-    pub end: NaiveDate, // Exclusive end date
+    pub start: NaiveDateTime,
+    pub end: NaiveDateTime, // Exclusive end
 }
 
 impl DateRange {
-    pub fn new(start: NaiveDate, end: NaiveDate) -> Result<Self, ParseError> {
+    pub fn new(start: NaiveDateTime, end: NaiveDateTime) -> Result<Self, ParseError> {
         if start > end {
             return Err(ParseError::InvalidRange {
                 start: start.to_string(),
@@ -17,11 +28,43 @@ impl DateRange {
         Ok(DateRange { start, end })
     }
 
-    /// Creates a range for a single day
+    /// Creates a range for a single day starting at midnight
     pub fn single_day(date: NaiveDate) -> Self {
-        DateRange {
-            start: date,
-            end: date + chrono::Days::new(1),
+        let start = date.and_hms_opt(0, 0, 0).unwrap();
+        let end = (date + chrono::Days::new(1)).and_hms_opt(0, 0, 0).unwrap();
+        DateRange { start, end }
+    }
+
+    /// Returns the duration of the date range in hours and minutes
+    pub fn duration(&self) -> TimeDuration {
+        let delta = self.end.signed_duration_since(self.start);
+        TimeDuration(delta)
+    }
+
+    /// Returns a sequence of DateRanges from the given DateRange
+    /// where each range in the result falls within a single day
+    /// i.e. doesn't cross over to the next day
+    pub fn partition_by_day(&self) -> Vec<Self> {
+        if self.start.day() == self.end.day() {
+            vec![self.clone()]
+        } else {
+            let mut partitions = vec![];
+            let mut curr = self.start;
+            while curr < self.end {
+                let start = curr.clone();
+                let next_day_midnight = curr
+                    .date()
+                    .succ_opt()
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap();
+                let end = std::cmp::min(next_day_midnight, self.end);
+                partitions.push(Self { start, end });
+                curr = (curr.date() + chrono::Days::new(1))
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap();
+            }
+            partitions
         }
     }
 }
@@ -132,12 +175,13 @@ fn parse_absolute_date(input: &str) -> Result<DateRange, ParseError> {
 
     // Try YYYY-MM (entire month)
     if let Ok(date) = NaiveDate::parse_from_str(&format!("{}-01", input), "%Y-%m-%d") {
-        let start = date;
-        let end = if date.month() == 12 {
+        let start = date.and_hms_opt(0, 0, 0).unwrap();
+        let end_date = if date.month() == 12 {
             NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap()
         } else {
             NaiveDate::from_ymd_opt(date.year(), date.month() + 1, 1).unwrap()
         };
+        let end = end_date.and_hms_opt(0, 0, 0).unwrap();
         return Ok(DateRange { start, end });
     }
 
@@ -212,12 +256,15 @@ fn parse_month_pattern(input: &str, today: NaiveDate) -> Result<DateRange, Parse
             year -= 1;
         }
 
-        let start = NaiveDate::from_ymd_opt(year, month as u32, 1).unwrap();
-        let end = if month == 12 {
+        let start_date = NaiveDate::from_ymd_opt(year, month as u32, 1).unwrap();
+        let end_date = if month == 12 {
             NaiveDate::from_ymd_opt(year + 1, 1, 1).unwrap()
         } else {
             NaiveDate::from_ymd_opt(year, (month + 1) as u32, 1).unwrap()
         };
+
+        let start = start_date.and_hms_opt(0, 0, 0).unwrap();
+        let end = end_date.and_hms_opt(0, 0, 0).unwrap();
 
         return Ok(DateRange { start, end });
     }
@@ -242,12 +289,15 @@ fn parse_quarter_pattern(input: &str, today: NaiveDate) -> Result<DateRange, Par
     let start_month = (quarter - 1) * 3 + 1;
     let end_month = start_month + 3;
 
-    let start = NaiveDate::from_ymd_opt(year, start_month, 1).unwrap();
-    let end = if end_month > 12 {
+    let start_date = NaiveDate::from_ymd_opt(year, start_month, 1).unwrap();
+    let end_date = if end_month > 12 {
         NaiveDate::from_ymd_opt(year + 1, 1, 1).unwrap()
     } else {
         NaiveDate::from_ymd_opt(year, end_month, 1).unwrap()
     };
+
+    let start = start_date.and_hms_opt(0, 0, 0).unwrap();
+    let end = end_date.and_hms_opt(0, 0, 0).unwrap();
 
     Ok(DateRange { start, end })
 }
@@ -308,19 +358,24 @@ fn parse_month_name_pattern(input: &str, today: NaiveDate) -> Option<DateRange> 
         today.year()
     };
 
-    let start = NaiveDate::from_ymd_opt(year, month_num, 1)?;
-    let end = if month_num == 12 {
+    let start_date = NaiveDate::from_ymd_opt(year, month_num, 1)?;
+    let end_date = if month_num == 12 {
         NaiveDate::from_ymd_opt(year + 1, 1, 1)?
     } else {
         NaiveDate::from_ymd_opt(year, month_num + 1, 1)?
     };
 
+    let start = start_date.and_hms_opt(0, 0, 0)?;
+    let end = end_date.and_hms_opt(0, 0, 0)?;
+
     Some(DateRange { start, end })
 }
 
 fn get_current_week(date: NaiveDate) -> DateRange {
-    let start = get_week_start(date);
-    let end = start + chrono::Days::new(7);
+    let start_date = get_week_start(date);
+    let end_date = start_date + chrono::Days::new(7);
+    let start = start_date.and_hms_opt(0, 0, 0).unwrap();
+    let end = end_date.and_hms_opt(0, 0, 0).unwrap();
     DateRange { start, end }
 }
 
@@ -331,12 +386,14 @@ fn get_week_start(date: NaiveDate) -> NaiveDate {
 }
 
 fn get_current_month(date: NaiveDate) -> DateRange {
-    let start = NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap();
-    let end = if date.month() == 12 {
+    let start_date = NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap();
+    let end_date = if date.month() == 12 {
         NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap()
     } else {
         NaiveDate::from_ymd_opt(date.year(), date.month() + 1, 1).unwrap()
     };
+    let start = start_date.and_hms_opt(0, 0, 0).unwrap();
+    let end = end_date.and_hms_opt(0, 0, 0).unwrap();
     DateRange { start, end }
 }
 
@@ -348,10 +405,10 @@ fn get_week_of_year(year: i32, week: u32) -> Result<DateRange, ParseError> {
     let target_week_start = week1_start + chrono::Days::new(((week - 1) * 7) as u64);
     let target_week_end = target_week_start + chrono::Days::new(7);
 
-    Ok(DateRange {
-        start: target_week_start,
-        end: target_week_end,
-    })
+    let start = target_week_start.and_hms_opt(0, 0, 0).unwrap();
+    let end = target_week_end.and_hms_opt(0, 0, 0).unwrap();
+
+    Ok(DateRange { start, end })
 }
 
 #[cfg(test)]
@@ -363,28 +420,42 @@ mod tests {
         NaiveDate::from_ymd_opt(year, month, day).unwrap()
     }
 
+    fn get_datetime_midnight(year: i32, month: u32, day: u32) -> NaiveDateTime {
+        get_date(year, month, day).and_hms_opt(0, 0, 0).unwrap()
+    }
+
     #[test]
     fn test_today() {
         let result = parse_time_duration("d").unwrap();
         let today = Local::now().date_naive();
-        assert_eq!(result.start, today);
-        assert_eq!(result.end, today + chrono::Days::new(1));
+        let start = today.and_hms_opt(0, 0, 0).unwrap();
+        let end = (today + chrono::Days::new(1)).and_hms_opt(0, 0, 0).unwrap();
+        assert_eq!(result.start, start);
+        assert_eq!(result.end, end);
     }
 
     #[test]
     fn test_yesterday() {
         let result = parse_time_duration("d-1").unwrap();
         let yesterday = Local::now().date_naive() - chrono::Days::new(1);
-        assert_eq!(result.start, yesterday);
-        assert_eq!(result.end, yesterday + chrono::Days::new(1));
+        let start = yesterday.and_hms_opt(0, 0, 0).unwrap();
+        let end = (yesterday + chrono::Days::new(1))
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        assert_eq!(result.start, start);
+        assert_eq!(result.end, end);
     }
 
     #[test]
     fn test_days_ago() {
         let result = parse_time_duration("d-5").unwrap();
         let five_days_ago = Local::now().date_naive() - chrono::Days::new(5);
-        assert_eq!(result.start, five_days_ago);
-        assert_eq!(result.end, five_days_ago + chrono::Days::new(1));
+        let start = five_days_ago.and_hms_opt(0, 0, 0).unwrap();
+        let end = (five_days_ago + chrono::Days::new(1))
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        assert_eq!(result.start, start);
+        assert_eq!(result.end, end);
     }
 
     #[test]
@@ -392,8 +463,12 @@ mod tests {
         let result = parse_time_duration("w").unwrap();
         let today = Local::now().date_naive();
         let week_start = get_week_start(today);
-        assert_eq!(result.start, week_start);
-        assert_eq!(result.end, week_start + chrono::Days::new(7));
+        let start = week_start.and_hms_opt(0, 0, 0).unwrap();
+        let end = (week_start + chrono::Days::new(7))
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        assert_eq!(result.start, start);
+        assert_eq!(result.end, end);
     }
 
     #[test]
@@ -402,8 +477,12 @@ mod tests {
         let today = Local::now().date_naive();
         let two_weeks_ago = today - chrono::Days::new(14);
         let week_start = get_week_start(two_weeks_ago);
-        assert_eq!(result.start, week_start);
-        assert_eq!(result.end, week_start + chrono::Days::new(7));
+        let start = week_start.and_hms_opt(0, 0, 0).unwrap();
+        let end = (week_start + chrono::Days::new(7))
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        assert_eq!(result.start, start);
+        assert_eq!(result.end, end);
     }
 
     #[test]
@@ -461,20 +540,20 @@ mod tests {
     fn test_quarter() {
         let result = parse_time_duration("q1").unwrap();
         let today = Local::now().date_naive();
-        assert_eq!(result.start, get_date(today.year(), 1, 1));
-        assert_eq!(result.end, get_date(today.year(), 4, 1));
+        assert_eq!(result.start, get_datetime_midnight(today.year(), 1, 1));
+        assert_eq!(result.end, get_datetime_midnight(today.year(), 4, 1));
 
         let result = parse_time_duration("q2").unwrap();
-        assert_eq!(result.start, get_date(today.year(), 4, 1));
-        assert_eq!(result.end, get_date(today.year(), 7, 1));
+        assert_eq!(result.start, get_datetime_midnight(today.year(), 4, 1));
+        assert_eq!(result.end, get_datetime_midnight(today.year(), 7, 1));
 
         let result = parse_time_duration("q3").unwrap();
-        assert_eq!(result.start, get_date(today.year(), 7, 1));
-        assert_eq!(result.end, get_date(today.year(), 10, 1));
+        assert_eq!(result.start, get_datetime_midnight(today.year(), 7, 1));
+        assert_eq!(result.end, get_datetime_midnight(today.year(), 10, 1));
 
         let result = parse_time_duration("q4").unwrap();
-        assert_eq!(result.start, get_date(today.year(), 10, 1));
-        assert_eq!(result.end, get_date(today.year() + 1, 1, 1));
+        assert_eq!(result.start, get_datetime_midnight(today.year(), 10, 1));
+        assert_eq!(result.end, get_datetime_midnight(today.year() + 1, 1, 1));
     }
 
     #[test]
@@ -496,7 +575,7 @@ mod tests {
     fn test_weekday_last_week() {
         let result = parse_time_duration("mon-1").unwrap();
         assert_eq!(result.start.weekday(), Weekday::Mon);
-        let today = Local::now().date_naive();
+        let today = Local::now().date_naive().and_hms_opt(0, 0, 0).unwrap();
         assert!(result.start < today);
 
         let result = parse_time_duration("fri-1").unwrap();
@@ -523,33 +602,33 @@ mod tests {
     #[test]
     fn test_absolute_date() {
         let result = parse_time_duration("2026-02-05").unwrap();
-        assert_eq!(result.start, get_date(2026, 2, 5));
-        assert_eq!(result.end, get_date(2026, 2, 6));
+        assert_eq!(result.start, get_datetime_midnight(2026, 2, 5));
+        assert_eq!(result.end, get_datetime_midnight(2026, 2, 6));
     }
 
     #[test]
     fn test_absolute_month() {
         let result = parse_time_duration("2025-07").unwrap();
-        assert_eq!(result.start, get_date(2025, 7, 1));
-        assert_eq!(result.end, get_date(2025, 8, 1));
+        assert_eq!(result.start, get_datetime_midnight(2025, 7, 1));
+        assert_eq!(result.end, get_datetime_midnight(2025, 8, 1));
 
         let result = parse_time_duration("2025-12").unwrap();
-        assert_eq!(result.start, get_date(2025, 12, 1));
-        assert_eq!(result.end, get_date(2026, 1, 1));
+        assert_eq!(result.start, get_datetime_midnight(2025, 12, 1));
+        assert_eq!(result.end, get_datetime_midnight(2026, 1, 1));
     }
 
     #[test]
     fn test_absolute_range_exclusive() {
         let result = parse_time_duration("2025-07-01..2025-07-20").unwrap();
-        assert_eq!(result.start, get_date(2025, 7, 1));
-        assert_eq!(result.end, get_date(2025, 7, 20));
+        assert_eq!(result.start, get_datetime_midnight(2025, 7, 1));
+        assert_eq!(result.end, get_datetime_midnight(2025, 7, 20));
     }
 
     #[test]
     fn test_absolute_range_inclusive() {
         let result = parse_time_duration("2025-07-01..=2025-07-20").unwrap();
-        assert_eq!(result.start, get_date(2025, 7, 1));
-        assert_eq!(result.end, get_date(2025, 7, 21));
+        assert_eq!(result.start, get_datetime_midnight(2025, 7, 1));
+        assert_eq!(result.end, get_datetime_midnight(2025, 7, 21));
     }
 
     #[test]
@@ -571,8 +650,8 @@ mod tests {
     #[test]
     fn test_range_spanning_years() {
         let result = parse_time_duration("2025-12-20..2026-01-10").unwrap();
-        assert_eq!(result.start, get_date(2025, 12, 20));
-        assert_eq!(result.end, get_date(2026, 1, 10));
+        assert_eq!(result.start, get_datetime_midnight(2025, 12, 20));
+        assert_eq!(result.end, get_datetime_midnight(2026, 1, 10));
     }
 
     #[test]
@@ -598,12 +677,12 @@ mod tests {
     #[test]
     fn test_date_range_equality() {
         let range1 = DateRange {
-            start: get_date(2025, 1, 1),
-            end: get_date(2025, 1, 2),
+            start: get_datetime_midnight(2025, 1, 1),
+            end: get_datetime_midnight(2025, 1, 2),
         };
         let range2 = DateRange {
-            start: get_date(2025, 1, 1),
-            end: get_date(2025, 1, 2),
+            start: get_datetime_midnight(2025, 1, 1),
+            end: get_datetime_midnight(2025, 1, 2),
         };
         assert_eq!(range1, range2);
     }
@@ -612,7 +691,110 @@ mod tests {
     fn test_single_day_range() {
         let date = get_date(2025, 6, 15);
         let range = DateRange::single_day(date);
-        assert_eq!(range.start, date);
-        assert_eq!(range.end, get_date(2025, 6, 16));
+        assert_eq!(range.start, get_datetime_midnight(2025, 6, 15));
+        assert_eq!(range.end, get_datetime_midnight(2025, 6, 16));
+    }
+
+    #[test]
+    fn test_duration() {
+        let range = DateRange::new(
+            get_date(2025, 1, 15).and_hms_opt(12, 10, 0).unwrap(),
+            get_date(2025, 1, 15).and_hms_opt(13, 45, 0).unwrap(),
+        )
+        .unwrap();
+        let duration = range.duration();
+        assert_eq!("01:35", duration.to_string());
+
+        // Single day range
+        let range = DateRange::single_day(get_date(2025, 1, 15));
+        let duration = range.duration();
+        assert_eq!("24:00", duration.to_string());
+
+        // Multi-day range
+        let range = DateRange {
+            start: get_date(2025, 1, 15).and_hms_opt(12, 10, 0).unwrap(),
+            end: get_date(2025, 1, 18).and_hms_opt(13, 20, 0).unwrap(), // 3 days
+        };
+        let duration = range.duration();
+        assert_eq!("73:10", duration.to_string());
+    }
+
+    #[test]
+    fn test_partition_by_day_across_day() {
+        let range = DateRange::new(
+            get_date(2025, 1, 15).and_hms_opt(22, 10, 0).unwrap(),
+            get_date(2025, 1, 16).and_hms_opt(02, 45, 0).unwrap(),
+        )
+        .unwrap();
+
+        let ranges = range.partition_by_day();
+        assert_eq!(2, ranges.len());
+
+        let r1 = &ranges[0];
+        assert_eq!(
+            get_date(2025, 1, 15).and_hms_opt(22, 10, 0).unwrap(),
+            r1.start
+        );
+        assert_eq!(get_date(2025, 1, 16).and_hms_opt(0, 0, 0).unwrap(), r1.end);
+
+        let r2 = &ranges[1];
+        assert_eq!(
+            get_date(2025, 1, 16).and_hms_opt(0, 0, 0).unwrap(),
+            r2.start
+        );
+        assert_eq!(get_date(2025, 1, 16).and_hms_opt(2, 45, 0).unwrap(), r2.end);
+    }
+
+    #[test]
+    fn test_partition_by_day_within_day() {
+        let range = DateRange::new(
+            get_date(2025, 1, 15).and_hms_opt(19, 10, 0).unwrap(),
+            get_date(2025, 1, 15).and_hms_opt(22, 07, 0).unwrap(),
+        )
+        .unwrap();
+
+        let ranges = range.partition_by_day();
+        assert_eq!(1, ranges.len());
+
+        let r1 = &ranges[0];
+        assert_eq!(
+            get_date(2025, 1, 15).and_hms_opt(19, 10, 0).unwrap(),
+            r1.start
+        );
+        assert_eq!(
+            get_date(2025, 1, 15).and_hms_opt(22, 07, 0).unwrap(),
+            r1.end
+        );
+    }
+
+    #[test]
+    fn test_partition_by_day_across_multiple_days() {
+        let range = DateRange::new(
+            get_date(2025, 1, 15).and_hms_opt(19, 10, 0).unwrap(),
+            get_date(2025, 1, 17).and_hms_opt(04, 07, 0).unwrap(),
+        )
+        .unwrap();
+
+        let ranges = range.partition_by_day();
+        assert_eq!(3, ranges.len());
+
+        let expected = vec![
+            ((2025, 1, 15, 19, 10, 0), (2025, 1, 16, 0, 0, 0)),
+            ((2025, 1, 16, 0, 0, 0), (2025, 1, 17, 0, 0, 0)),
+            ((2025, 1, 17, 0, 0, 0), (2025, 1, 17, 4, 7, 0)),
+        ];
+
+        for (i, exp) in expected.into_iter().enumerate() {
+            let range = &ranges[i];
+            let (s, e) = exp;
+            assert_eq!(
+                get_date(s.0, s.1, s.2).and_hms_opt(s.3, s.4, s.5).unwrap(),
+                range.start
+            );
+            assert_eq!(
+                get_date(e.0, e.1, e.2).and_hms_opt(e.3, e.4, e.5).unwrap(),
+                range.end
+            );
+        }
     }
 }
