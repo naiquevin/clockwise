@@ -1,11 +1,11 @@
-use crate::time_duration::DateRange;
+use crate::time_duration::DateTimeRange;
 use chrono::NaiveDateTime;
 
 /// Parses org-mode CLOCK entries from a line buffer and returns DateRange instances.
 /// Each line is checked for CLOCK entries in the format:
 /// CLOCK: [2025-01-23 Thu 12:28]--[2025-01-23 Thu 13:17] =>  0:49
 /// If a clock entry spans multiple days, it creates separate DateRange instances for each day.
-pub fn parse_org_clock_entries<'a>(lines: impl IntoIterator<Item = &'a str>) -> Vec<DateRange> {
+pub fn parse_org_clock_entries<'a>(lines: impl IntoIterator<Item = &'a str>) -> Vec<DateTimeRange> {
     let mut entries = Vec::new();
 
     for line in lines {
@@ -17,7 +17,7 @@ pub fn parse_org_clock_entries<'a>(lines: impl IntoIterator<Item = &'a str>) -> 
 
 /// Parses a single CLOCK entry line and extracts the time range as a DateRange.
 /// Returns empty Vec if the line is not a valid CLOCK entry.
-fn parse_clock_entry(line: &str) -> Vec<DateRange> {
+fn parse_clock_entry(line: &str) -> Vec<DateTimeRange> {
     // Format: CLOCK: [2025-01-23 Thu 12:28]--[2025-01-23 Thu 13:17] =>  0:49
     if !line.contains("CLOCK:") {
         return Vec::new();
@@ -57,7 +57,7 @@ fn parse_clock_entry(line: &str) -> Vec<DateRange> {
     };
 
     // Create a single DateRange for the clock entry
-    match DateRange::new(start_dt, end_dt) {
+    match DateTimeRange::new(start_dt, end_dt) {
         Ok(range) => range.partition_by_day(),
         Err(_) => Vec::new(),
     }

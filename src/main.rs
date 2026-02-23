@@ -1,7 +1,7 @@
 mod org_parser;
 mod time_duration;
 
-use time_duration::DateRange;
+use time_duration::DateTimeRange;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Breakdown {
@@ -14,7 +14,7 @@ pub enum Breakdown {
 impl Breakdown {
     /// Checks if the breakdown duration is smaller than the time duration
     /// represented by the DateRange.
-    pub fn is_smaller_than_duration(&self, date_range: &DateRange) -> bool {
+    pub fn is_smaller_than_duration(&self, date_range: &DateTimeRange) -> bool {
         let days = (date_range.end - date_range.start).num_days();
 
         match self {

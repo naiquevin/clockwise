@@ -12,12 +12,12 @@ impl std::fmt::Display for TimeDuration {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DateRange {
+pub struct DateTimeRange {
     pub start: NaiveDateTime,
     pub end: NaiveDateTime, // Exclusive end
 }
 
-impl DateRange {
+impl DateTimeRange {
     pub fn new(start: NaiveDateTime, end: NaiveDateTime) -> Result<Self, ParseError> {
         if start > end {
             return Err(ParseError::InvalidRange {
@@ -25,14 +25,14 @@ impl DateRange {
                 end: end.to_string(),
             });
         }
-        Ok(DateRange { start, end })
+        Ok(DateTimeRange { start, end })
     }
 
     /// Creates a range for a single day starting at midnight
     pub fn single_day(date: NaiveDate) -> Self {
         let start = date.and_hms_opt(0, 0, 0).unwrap();
         let end = (date + chrono::Days::new(1)).and_hms_opt(0, 0, 0).unwrap();
-        DateRange { start, end }
+        DateTimeRange { start, end }
     }
 
     /// Returns the duration of the date range in hours and minutes
@@ -83,7 +83,7 @@ pub enum ParseError {
     InvalidQuarter(u32),
 }
 
-pub fn parse_time_duration(input: &str) -> Result<DateRange, ParseError> {
+pub fn parse_time_duration(input: &str) -> Result<DateTimeRange, ParseError> {
     let input = input.trim();
 
     // Check for ranges first
@@ -109,7 +109,11 @@ fn parse_range_syntax(input: &str) -> Option<(&str, &str, bool)> {
     None
 }
 
-fn parse_range(start_str: &str, end_str: &str, inclusive: bool) -> Result<DateRange, ParseError> {
+fn parse_range(
+    start_str: &str,
+    end_str: &str,
+    inclusive: bool,
+) -> Result<DateTimeRange, ParseError> {
     let start_range = parse_single_duration(start_str)?;
     let end_range = parse_single_duration(end_str)?;
 
@@ -120,10 +124,10 @@ fn parse_range(start_str: &str, end_str: &str, inclusive: bool) -> Result<DateRa
         end_range.start
     };
 
-    DateRange::new(start, end)
+    DateTimeRange::new(start, end)
 }
 
-fn parse_single_duration(input: &str) -> Result<DateRange, ParseError> {
+fn parse_single_duration(input: &str) -> Result<DateTimeRange, ParseError> {
     let today = Local::now().date_naive();
 
     // First check for absolute dates (YYYY-MM-DD or YYYY-MM)
@@ -167,10 +171,10 @@ fn parse_single_duration(input: &str) -> Result<DateRange, ParseError> {
     Err(ParseError::InvalidFormat(input.to_string()))
 }
 
-fn parse_absolute_date(input: &str) -> Result<DateRange, ParseError> {
+fn parse_absolute_date(input: &str) -> Result<DateTimeRange, ParseError> {
     // Try YYYY-MM-DD
     if let Ok(date) = NaiveDate::parse_from_str(input, "%Y-%m-%d") {
-        return Ok(DateRange::single_day(date));
+        return Ok(DateTimeRange::single_day(date));
     }
 
     // Try YYYY-MM (entire month)
@@ -182,15 +186,15 @@ fn parse_absolute_date(input: &str) -> Result<DateRange, ParseError> {
             NaiveDate::from_ymd_opt(date.year(), date.month() + 1, 1).unwrap()
         };
         let end = end_date.and_hms_opt(0, 0, 0).unwrap();
-        return Ok(DateRange { start, end });
+        return Ok(DateTimeRange { start, end });
     }
 
     Err(ParseError::InvalidDate(input.to_string()))
 }
 
-fn parse_day_pattern(input: &str, today: NaiveDate) -> Result<DateRange, ParseError> {
+fn parse_day_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, ParseError> {
     if input == "d" {
-        return Ok(DateRange::single_day(today));
+        return Ok(DateTimeRange::single_day(today));
     }
 
     // d-n pattern
@@ -200,13 +204,13 @@ fn parse_day_pattern(input: &str, today: NaiveDate) -> Result<DateRange, ParseEr
             .parse()
             .map_err(|_| ParseError::InvalidFormat(input.to_string()))?;
         let date = today - chrono::Days::new(n as u64);
-        return Ok(DateRange::single_day(date));
+        return Ok(DateTimeRange::single_day(date));
     }
 
     Err(ParseError::InvalidFormat(input.to_string()))
 }
 
-fn parse_week_pattern(input: &str, today: NaiveDate) -> Result<DateRange, ParseError> {
+fn parse_week_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, ParseError> {
     if input == "w" {
         return Ok(get_current_week(today));
     }
@@ -235,7 +239,7 @@ fn parse_week_pattern(input: &str, today: NaiveDate) -> Result<DateRange, ParseE
     Err(ParseError::InvalidFormat(input.to_string()))
 }
 
-fn parse_month_pattern(input: &str, today: NaiveDate) -> Result<DateRange, ParseError> {
+fn parse_month_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, ParseError> {
     if input == "m" {
         return Ok(get_current_month(today));
     }
@@ -266,13 +270,13 @@ fn parse_month_pattern(input: &str, today: NaiveDate) -> Result<DateRange, Parse
         let start = start_date.and_hms_opt(0, 0, 0).unwrap();
         let end = end_date.and_hms_opt(0, 0, 0).unwrap();
 
-        return Ok(DateRange { start, end });
+        return Ok(DateTimeRange { start, end });
     }
 
     Err(ParseError::InvalidFormat(input.to_string()))
 }
 
-fn parse_quarter_pattern(input: &str, today: NaiveDate) -> Result<DateRange, ParseError> {
+fn parse_quarter_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, ParseError> {
     if input.len() != 2 {
         return Err(ParseError::InvalidFormat(input.to_string()));
     }
@@ -299,10 +303,10 @@ fn parse_quarter_pattern(input: &str, today: NaiveDate) -> Result<DateRange, Par
     let start = start_date.and_hms_opt(0, 0, 0).unwrap();
     let end = end_date.and_hms_opt(0, 0, 0).unwrap();
 
-    Ok(DateRange { start, end })
+    Ok(DateTimeRange { start, end })
 }
 
-fn parse_weekday_pattern(input: &str, today: NaiveDate) -> Option<DateRange> {
+fn parse_weekday_pattern(input: &str, today: NaiveDate) -> Option<DateTimeRange> {
     let (weekday_str, offset) = if input.contains('-') {
         let parts: Vec<&str> = input.split('-').collect();
         if parts.len() != 2 {
@@ -329,10 +333,10 @@ fn parse_weekday_pattern(input: &str, today: NaiveDate) -> Option<DateRange> {
     let days_from_monday = weekday.num_days_from_monday();
     let target_date = target_week_start + chrono::Days::new(days_from_monday as u64);
 
-    Some(DateRange::single_day(target_date))
+    Some(DateTimeRange::single_day(target_date))
 }
 
-fn parse_month_name_pattern(input: &str, today: NaiveDate) -> Option<DateRange> {
+fn parse_month_name_pattern(input: &str, today: NaiveDate) -> Option<DateTimeRange> {
     let month_num = match input {
         "jan" => 1,
         "feb" => 2,
@@ -368,15 +372,15 @@ fn parse_month_name_pattern(input: &str, today: NaiveDate) -> Option<DateRange> 
     let start = start_date.and_hms_opt(0, 0, 0)?;
     let end = end_date.and_hms_opt(0, 0, 0)?;
 
-    Some(DateRange { start, end })
+    Some(DateTimeRange { start, end })
 }
 
-fn get_current_week(date: NaiveDate) -> DateRange {
+fn get_current_week(date: NaiveDate) -> DateTimeRange {
     let start_date = get_week_start(date);
     let end_date = start_date + chrono::Days::new(7);
     let start = start_date.and_hms_opt(0, 0, 0).unwrap();
     let end = end_date.and_hms_opt(0, 0, 0).unwrap();
-    DateRange { start, end }
+    DateTimeRange { start, end }
 }
 
 fn get_week_start(date: NaiveDate) -> NaiveDate {
@@ -385,7 +389,7 @@ fn get_week_start(date: NaiveDate) -> NaiveDate {
     date - chrono::Days::new(days_from_monday as u64)
 }
 
-fn get_current_month(date: NaiveDate) -> DateRange {
+fn get_current_month(date: NaiveDate) -> DateTimeRange {
     let start_date = NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap();
     let end_date = if date.month() == 12 {
         NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap()
@@ -394,10 +398,10 @@ fn get_current_month(date: NaiveDate) -> DateRange {
     };
     let start = start_date.and_hms_opt(0, 0, 0).unwrap();
     let end = end_date.and_hms_opt(0, 0, 0).unwrap();
-    DateRange { start, end }
+    DateTimeRange { start, end }
 }
 
-fn get_week_of_year(year: i32, week: u32) -> Result<DateRange, ParseError> {
+fn get_week_of_year(year: i32, week: u32) -> Result<DateTimeRange, ParseError> {
     // ISO week date: week 1 is the week with the first Thursday of the year
     let jan_4 = NaiveDate::from_ymd_opt(year, 1, 4).unwrap();
     let week1_start = get_week_start(jan_4);
@@ -408,7 +412,7 @@ fn get_week_of_year(year: i32, week: u32) -> Result<DateRange, ParseError> {
     let start = target_week_start.and_hms_opt(0, 0, 0).unwrap();
     let end = target_week_end.and_hms_opt(0, 0, 0).unwrap();
 
-    Ok(DateRange { start, end })
+    Ok(DateTimeRange { start, end })
 }
 
 #[cfg(test)]
@@ -676,11 +680,11 @@ mod tests {
 
     #[test]
     fn test_date_range_equality() {
-        let range1 = DateRange {
+        let range1 = DateTimeRange {
             start: get_datetime_midnight(2025, 1, 1),
             end: get_datetime_midnight(2025, 1, 2),
         };
-        let range2 = DateRange {
+        let range2 = DateTimeRange {
             start: get_datetime_midnight(2025, 1, 1),
             end: get_datetime_midnight(2025, 1, 2),
         };
@@ -690,14 +694,14 @@ mod tests {
     #[test]
     fn test_single_day_range() {
         let date = get_date(2025, 6, 15);
-        let range = DateRange::single_day(date);
+        let range = DateTimeRange::single_day(date);
         assert_eq!(range.start, get_datetime_midnight(2025, 6, 15));
         assert_eq!(range.end, get_datetime_midnight(2025, 6, 16));
     }
 
     #[test]
     fn test_duration() {
-        let range = DateRange::new(
+        let range = DateTimeRange::new(
             get_date(2025, 1, 15).and_hms_opt(12, 10, 0).unwrap(),
             get_date(2025, 1, 15).and_hms_opt(13, 45, 0).unwrap(),
         )
@@ -706,12 +710,12 @@ mod tests {
         assert_eq!("01:35", duration.to_string());
 
         // Single day range
-        let range = DateRange::single_day(get_date(2025, 1, 15));
+        let range = DateTimeRange::single_day(get_date(2025, 1, 15));
         let duration = range.duration();
         assert_eq!("24:00", duration.to_string());
 
         // Multi-day range
-        let range = DateRange {
+        let range = DateTimeRange {
             start: get_date(2025, 1, 15).and_hms_opt(12, 10, 0).unwrap(),
             end: get_date(2025, 1, 18).and_hms_opt(13, 20, 0).unwrap(), // 3 days
         };
@@ -721,7 +725,7 @@ mod tests {
 
     #[test]
     fn test_partition_by_day_across_day() {
-        let range = DateRange::new(
+        let range = DateTimeRange::new(
             get_date(2025, 1, 15).and_hms_opt(22, 10, 0).unwrap(),
             get_date(2025, 1, 16).and_hms_opt(02, 45, 0).unwrap(),
         )
@@ -747,7 +751,7 @@ mod tests {
 
     #[test]
     fn test_partition_by_day_within_day() {
-        let range = DateRange::new(
+        let range = DateTimeRange::new(
             get_date(2025, 1, 15).and_hms_opt(19, 10, 0).unwrap(),
             get_date(2025, 1, 15).and_hms_opt(22, 07, 0).unwrap(),
         )
@@ -769,7 +773,7 @@ mod tests {
 
     #[test]
     fn test_partition_by_day_across_multiple_days() {
-        let range = DateRange::new(
+        let range = DateTimeRange::new(
             get_date(2025, 1, 15).and_hms_opt(19, 10, 0).unwrap(),
             get_date(2025, 1, 17).and_hms_opt(04, 07, 0).unwrap(),
         )
