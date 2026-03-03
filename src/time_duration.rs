@@ -1,13 +1,24 @@
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, TimeDelta, Weekday};
 
+use crate::datetime_util::secs_to_rounded_hours_mins;
+
 pub struct TimeDuration(TimeDelta);
 
 impl std::fmt::Display for TimeDuration {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let total_minutes = self.0.num_minutes();
-        let hours = total_minutes / 60;
-        let minutes = total_minutes % 60;
+        let total_seconds = self.0.num_seconds();
+        let (hours, minutes) = secs_to_rounded_hours_mins(total_seconds);
         write!(f, "{hours:02}:{minutes:02}")
+    }
+}
+
+impl TimeDuration {
+    pub fn seconds(&self) -> i64 {
+        self.0.num_seconds()
+    }
+
+    pub fn inner(&self) -> &TimeDelta {
+        &self.0
     }
 }
 
@@ -52,13 +63,11 @@ impl DateTimeRange {
             let mut curr = self.start;
             while curr < self.end {
                 let start = curr.clone();
-                let next_day_midnight = curr
+                let eod = curr
                     .date()
-                    .succ_opt()
-                    .unwrap()
-                    .and_hms_opt(0, 0, 0)
+                    .and_hms_opt(23, 59, 59)
                     .unwrap();
-                let end = std::cmp::min(next_day_midnight, self.end);
+                let end = std::cmp::min(self.end, eod);
                 partitions.push(Self { start, end });
                 curr = (curr.date() + chrono::Days::new(1))
                     .and_hms_opt(0, 0, 0)
@@ -66,6 +75,10 @@ impl DateTimeRange {
             }
             partitions
         }
+    }
+
+    pub fn is_between(&self, other: &Self) -> bool {
+        self.start >= other.start && self.end < other.end
     }
 }
 
@@ -739,7 +752,7 @@ mod tests {
             get_date(2025, 1, 15).and_hms_opt(22, 10, 0).unwrap(),
             r1.start
         );
-        assert_eq!(get_date(2025, 1, 16).and_hms_opt(0, 0, 0).unwrap(), r1.end);
+        assert_eq!(get_date(2025, 1, 15).and_hms_opt(23, 59, 59).unwrap(), r1.end);
 
         let r2 = &ranges[1];
         assert_eq!(
@@ -783,8 +796,8 @@ mod tests {
         assert_eq!(3, ranges.len());
 
         let expected = vec![
-            ((2025, 1, 15, 19, 10, 0), (2025, 1, 16, 0, 0, 0)),
-            ((2025, 1, 16, 0, 0, 0), (2025, 1, 17, 0, 0, 0)),
+            ((2025, 1, 15, 19, 10, 0), (2025, 1, 15, 23, 59, 59)),
+            ((2025, 1, 16, 0, 0, 0), (2025, 1, 16, 23, 59, 59)),
             ((2025, 1, 17, 0, 0, 0), (2025, 1, 17, 4, 7, 0)),
         ];
 

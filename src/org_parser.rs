@@ -5,11 +5,11 @@ use chrono::NaiveDateTime;
 /// Each line is checked for CLOCK entries in the format:
 /// CLOCK: [2025-01-23 Thu 12:28]--[2025-01-23 Thu 13:17] =>  0:49
 /// If a clock entry spans multiple days, it creates separate DateRange instances for each day.
-pub fn parse_org_clock_entries<'a>(lines: impl IntoIterator<Item = &'a str>) -> Vec<DateTimeRange> {
+pub fn parse_org_clock_entries(lines: impl IntoIterator<Item = String>) -> Vec<DateTimeRange> {
     let mut entries = Vec::new();
 
     for line in lines {
-        entries.extend(parse_clock_entry(line));
+        entries.extend(parse_clock_entry(&line));
     }
 
     entries
@@ -56,7 +56,8 @@ fn parse_clock_entry(line: &str) -> Vec<DateTimeRange> {
         None => return Vec::new(),
     };
 
-    // Create a single DateRange for the clock entry
+    // Create date ranges for the clock entry. Multiple date ranges
+    // are possible if the start and end time is across multiple days.
     match DateTimeRange::new(start_dt, end_dt) {
         Ok(range) => range.partition_by_day(),
         Err(_) => Vec::new(),
@@ -117,7 +118,7 @@ mod tests {
 
         assert_eq!(2, result.len());
         assert_eq!(get_datetime(2025, 1, 23, 23, 30, 0), result[0].start);
-        assert_eq!(get_datetime(2025, 1, 24, 0, 0, 0), result[0].end);
+        assert_eq!(get_datetime(2025, 1, 23, 23, 59, 59), result[0].end);
         assert_eq!("00:30", result[0].duration().to_string());
 
         assert_eq!(get_datetime(2025, 1, 24, 0, 0, 0), result[1].start);
@@ -133,15 +134,19 @@ mod tests {
         assert_eq!(0, result.len());
     }
 
+    fn make_lines(xs: Vec<&str>) -> Vec<String> {
+        xs.into_iter().map(|x| x.to_string()).collect()
+    }
+
     #[test]
     fn test_parse_multiple_entries() {
-        let lines = vec![
+        let lines = make_lines(vec![
             ":LOGBOOK:",
             "CLOCK: [2025-11-28 Fri 09:32]--[2025-11-28 Fri 10:27] =>  0:55",
             "CLOCK: [2025-11-27 Thu 22:08]--[2025-11-27 Thu 23:57] =>  1:49",
             "CLOCK: [2025-11-26 Wed 23:25]--[2025-11-27 Thu 00:42] =>  1:17",
             ":END:",
-        ];
+        ]);
 
         let results = parse_org_clock_entries(lines);
 
@@ -163,7 +168,7 @@ mod tests {
 
         // Third entry spans midnight: 23:25 to 23:59 = 35 minutes
         assert_eq!(get_datetime(2025, 11, 26, 23, 25, 0), results[2].start);
-        assert_eq!(get_datetime(2025, 11, 27, 0, 0, 0), results[2].end);
+        assert_eq!(get_datetime(2025, 11, 26, 23, 59, 59), results[2].end);
         assert_eq!("00:35", results[2].duration().to_string());
 
         // Fourth entry spans 00:00 to 00:42 = 42 minutes
@@ -174,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_parse_empty_lines() {
-        let lines: Vec<&str> = vec![];
+        let lines: Vec<String> = vec![];
         let results = parse_org_clock_entries(lines);
 
         assert_eq!(0, results.len());

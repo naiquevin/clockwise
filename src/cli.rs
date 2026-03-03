@@ -1,8 +1,14 @@
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::PathBuf,
+};
 
 use clap::Parser;
 
-use crate::{Breakdown, error::Error, time_duration::parse_time_duration};
+use crate::{
+    breakdown::{Breakdown, bucket_label}, datetime_util::secs_to_rounded_hours_mins, error::Error, org_parser::parse_org_clock_entries, time_duration::parse_time_duration
+};
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -24,7 +30,59 @@ impl Cli {
                 None
             }
         });
-        println!("Date time range: {time_duration:?}; Breakdown: {breakdown:?}");
+        // println!("Date time range: {time_duration:?}; Breakdown: {breakdown:?}");
+
+        let file = File::open(&self.path)?;
+        let reader = BufReader::new(file);
+        let lines = reader
+            .lines()
+            .collect::<Result<Vec<String>, std::io::Error>>()?;
+        let entries = parse_org_clock_entries(lines);
+
+        println!("From {} to {}", time_duration.start.format("%Y-%m-%d"), time_duration.end.format("%Y-%m-%d"));
+        println!("{}", "-".repeat(30));
+
+        if let Some(b) = breakdown {
+            let buckets = b.buckets(&time_duration);
+            let mut agg: Vec<i64> = vec![0; buckets.len()];
+            for entry in entries {
+                if entry.start < time_duration.start || entry.end >= time_duration.end {
+                    continue;
+                }
+                for (i, bucket) in buckets.iter().enumerate() {
+                    if entry.is_between(bucket) {
+                        let duration = entry.duration();
+                        agg[i] += duration.seconds();
+                        continue;
+                    }
+                }
+            }
+
+            let mut total_seconds = 0;
+
+            for (i, bucket) in buckets.iter().enumerate() {
+                // println!("Bucket = {bucket:?}");
+                let label = bucket_label(&b, &bucket.start, &time_duration);
+                let (hours, minutes) = secs_to_rounded_hours_mins(agg[i]);
+                println!("{label} {hours:02}:{minutes:02}");
+                total_seconds += agg[i];
+            }
+
+            let (hours, minutes) = secs_to_rounded_hours_mins(total_seconds);
+            println!("{}", "-".repeat(30));
+            println!("Total: {hours:02} hours {minutes:02} minutes");
+
+        } else {
+            let mut total_seconds = 0;
+            for entry in entries {
+                if entry.is_between(&time_duration) {
+                    let entry_duration = entry.duration();
+                    total_seconds += entry_duration.seconds();
+                }
+            }
+            let (hours, minutes) = secs_to_rounded_hours_mins(total_seconds);
+            println!("Total: {hours:02} hours {minutes:02} minutes");
+        }
         Ok(0)
     }
 }
