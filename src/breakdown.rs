@@ -11,10 +11,15 @@ use crate::{
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum Breakdown {
+    #[value(alias = "d")]
     Day,
+    #[value(alias = "w")]
     Week,
+    #[value(alias = "m")]
     Month,
+    #[value(alias = "q")]
     Quarter,
+    #[value(alias = "y")]
     Year,
 }
 
