@@ -1,5 +1,0 @@
-#+title: About clockwise
-
-Clockwise is a command line tool written in Rust that reads one or
-more ~.org~ i.e. emacs org-mode files and aggregates the clock entries
-in it along with displaying the total time spent in that duration.

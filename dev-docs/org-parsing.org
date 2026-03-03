@@ -1,0 +1,24 @@
+#+title: Parsing org files
+
+* Clock entries
+  - Clock entries are found inside the ~LOGBOOK~ drawer of an item
+  - By default the timestamp format is
+    #+begin_src elisp
+      ("%Y-%m-%d %a" . "%Y-%m-%d %a %H:%M")
+    #+end_src
+  - This can be verified by inspecting the ~org-time-stamp-formats~
+    variable. As long as the ~org-time-stamp-formats~ variable is not
+    overridden, we can assume this to be the format.
+  - For example:
+    #+begin_src org
+      :LOGBOOK:
+      CLOCK: [2025-12-16 Tue 11:09]--[2025-12-16 Tue 11:23] =>  0:14
+      CLOCK: [2025-12-15 Mon 14:44]--[2025-12-15 Mon 15:31] =>  0:47
+      :END:
+    #+end_src
+  - Note that there's another variable ~org-time-stamp-custom-formats~
+    that controls how the timestamps are displayed, but they are just
+    overlays in the buffer. The actual format in the text file is of
+    the above format defined by ~org-time-stamp-formats~.
+
+

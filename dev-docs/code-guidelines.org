@@ -1,0 +1,27 @@
+#+title: Code Guidelines
+
+* Code Organization
+  - Start with simple code in main.rs; Refactor when needed, not
+    preemptively
+  - Move code to its own module only when it evolves to have significant
+    complexity (many methods, large implementation, etc.)
+  - Example: TimeDuration has its own module because there's a fair
+    amount of code in it. Breakdown stays in main.rs since it's
+    simple. Only when ~Breakdown~ evolved to have some methods, it was
+    moved into its own module.
+
+* Use date time without timezone for org mode timestamps
+  - _Why?_ Because org-mode assumes that all timestamps are in local
+    times
+  - Use NaiveDateTime, NaiveDate, NaiveTime instead of their timezone
+    aware equivalents
+
+* The DateTimeRange struct
+  - Try to reuse the DateTimeRange struct as far as possible to
+    represent a time range
+  - For e.g. the struct is used to internally represent the
+    time-duration CLI option (~-t~) as well the breakdown buckets.
+
+* Assertions in code
+  - Use of assertions in actual code (against tests) is encouraged
+  - If there's no way to handle an error, it's better to fail

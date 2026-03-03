@@ -79,7 +79,6 @@
      breakdown and show the output (as if breakdown was not specified) but
      show a warning
 
-
 * Examples
   #+begin_src bash
     # Yesterday's time

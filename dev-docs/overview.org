@@ -1,0 +1,7 @@
+#+title: Project overview
+
+Clockwise is a command line tool that reads one or more ~.org~
+i.e. emacs org-mode files and aggregates the clock entries in it,
+displaying the total time spent in that duration.
+
+Clockwise is written in Rust
