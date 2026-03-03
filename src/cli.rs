@@ -7,7 +7,11 @@ use std::{
 use clap::Parser;
 
 use crate::{
-    breakdown::{Breakdown, bucket_label}, datetime_util::secs_to_rounded_hours_mins, error::Error, org_parser::parse_org_clock_entries, time_duration::parse_time_duration
+    breakdown::{Breakdown, bucket_label},
+    datetime_util::secs_to_rounded_hours_mins,
+    error::Error,
+    org_parser::parse_org_clock_entries,
+    time_duration::parse_time_duration,
 };
 
 #[derive(Debug, Parser)]
@@ -39,7 +43,11 @@ impl Cli {
             .collect::<Result<Vec<String>, std::io::Error>>()?;
         let entries = parse_org_clock_entries(lines);
 
-        println!("From {} to {}", time_duration.start.format("%Y-%m-%d"), time_duration.end.format("%Y-%m-%d"));
+        println!(
+            "From {} to {}",
+            time_duration.start.format("%Y-%m-%d"),
+            time_duration.end.format("%Y-%m-%d")
+        );
         println!("{}", "-".repeat(30));
 
         if let Some(b) = breakdown {
@@ -62,7 +70,7 @@ impl Cli {
 
             for (i, bucket) in buckets.iter().enumerate() {
                 // println!("Bucket = {bucket:?}");
-                let label = bucket_label(&b, &bucket.start, &time_duration);
+                let label = bucket_label(b, &bucket.start, &time_duration);
                 let (hours, minutes) = secs_to_rounded_hours_mins(agg[i]);
                 println!("{label} {hours:02}:{minutes:02}");
                 total_seconds += agg[i];
@@ -71,7 +79,6 @@ impl Cli {
             let (hours, minutes) = secs_to_rounded_hours_mins(total_seconds);
             println!("{}", "-".repeat(30));
             println!("Total: {hours:02} hours {minutes:02} minutes");
-
         } else {
             let mut total_seconds = 0;
             for entry in entries {

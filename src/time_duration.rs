@@ -62,11 +62,8 @@ impl DateTimeRange {
             let mut partitions = vec![];
             let mut curr = self.start;
             while curr < self.end {
-                let start = curr.clone();
-                let eod = curr
-                    .date()
-                    .and_hms_opt(23, 59, 59)
-                    .unwrap();
+                let start = curr;
+                let eod = curr.date().and_hms_opt(23, 59, 59).unwrap();
                 let end = std::cmp::min(self.end, eod);
                 partitions.push(Self { start, end });
                 curr = (curr.date() + chrono::Days::new(1))
@@ -82,6 +79,7 @@ impl DateTimeRange {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     #[error("Invalid format: {0}")]
@@ -211,8 +209,7 @@ fn parse_day_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, Par
     }
 
     // d-n pattern
-    if input.starts_with("d-") {
-        let n_str = &input[2..];
+    if let Some(n_str) = input.strip_prefix("d-") {
         let n: u32 = n_str
             .parse()
             .map_err(|_| ParseError::InvalidFormat(input.to_string()))?;
@@ -229,8 +226,7 @@ fn parse_week_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, Pa
     }
 
     // w-n pattern (n weeks ago)
-    if input.starts_with("w-") {
-        let n_str = &input[2..];
+    if let Some(n_str) = input.strip_prefix("w-") {
         let n: u32 = n_str
             .parse()
             .map_err(|_| ParseError::InvalidFormat(input.to_string()))?;
@@ -243,7 +239,7 @@ fn parse_week_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, Pa
         let week_num: u32 = input[1..]
             .parse()
             .map_err(|_| ParseError::InvalidFormat(input.to_string()))?;
-        if week_num < 1 || week_num > 53 {
+        if !(1..=53).contains(&week_num) {
             return Err(ParseError::InvalidWeekNumber(week_num));
         }
         return get_week_of_year(today.year(), week_num);
@@ -258,8 +254,7 @@ fn parse_month_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange, P
     }
 
     // m-n pattern
-    if input.starts_with("m-") {
-        let n_str = &input[2..];
+    if let Some(n_str) = input.strip_prefix("m-") {
         let n: i32 = n_str
             .parse()
             .map_err(|_| ParseError::InvalidFormat(input.to_string()))?;
@@ -298,7 +293,7 @@ fn parse_quarter_pattern(input: &str, today: NaiveDate) -> Result<DateTimeRange,
         .parse()
         .map_err(|_| ParseError::InvalidFormat(input.to_string()))?;
 
-    if quarter < 1 || quarter > 4 {
+    if !(1..=4).contains(&quarter) {
         return Err(ParseError::InvalidQuarter(quarter));
     }
 
@@ -752,7 +747,10 @@ mod tests {
             get_date(2025, 1, 15).and_hms_opt(22, 10, 0).unwrap(),
             r1.start
         );
-        assert_eq!(get_date(2025, 1, 15).and_hms_opt(23, 59, 59).unwrap(), r1.end);
+        assert_eq!(
+            get_date(2025, 1, 15).and_hms_opt(23, 59, 59).unwrap(),
+            r1.end
+        );
 
         let r2 = &ranges[1];
         assert_eq!(

@@ -1,4 +1,7 @@
-use chrono::{Datelike, Days, Duration, NaiveDateTime, NaiveTime, format::{DelayedFormat, StrftimeItems}};
+use chrono::{
+    Datelike, Days, Duration, NaiveDateTime, NaiveTime,
+    format::{DelayedFormat, StrftimeItems},
+};
 use clap::ValueEnum;
 
 use crate::{
