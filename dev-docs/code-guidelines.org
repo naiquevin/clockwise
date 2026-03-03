@@ -10,6 +10,21 @@
     simple. Only when ~Breakdown~ evolved to have some methods, it was
     moved into its own module.
 
+* Use of coding assistants
+  - Encouraged to perform tedious tasks, write tests etc.
+  - Personally I've found it effective to have coding assistants write
+    individual modules with extensive tests. While the
+    integeration/glue code is better written manually.
+
+* dev-docs v/s CLAUDE.md
+  - Later is purely for coding assistants
+  - Former is primarily for humans to read and edit. But coding
+    assistants must also read if when required.
+  - One common workflow is to write a dev-doc and ask the coding
+    assistant to treat it like a prompt. Once the task is performed,
+    modify the dev doc to make it sound more like a doc or a spec
+    instead of a prompt.
+
 * Use date time without timezone for org mode timestamps
   - _Why?_ Because org-mode assumes that all timestamps are in local
     times
