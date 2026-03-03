@@ -4,6 +4,6 @@ use crate::time_duration;
 pub enum Error {
     #[error("{0}")]
     TimeDuration(#[from] time_duration::ParseError),
-    #[error("Invalid breakdown value: {0}")]
-    InvalidBreakDown(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
 }
