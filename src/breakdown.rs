@@ -105,3 +105,162 @@ pub fn bucket_label<'a>(
         Breakdown::Year => bucket_start.format("%Y"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    fn dt(year: i32, month: u32, day: u32, hour: u32, min: u32) -> NaiveDateTime {
+        NaiveDate::from_ymd_opt(year, month, day)
+            .unwrap()
+            .and_hms_opt(hour, min, 0)
+            .unwrap()
+    }
+
+    fn range(start: NaiveDateTime, end: NaiveDateTime) -> DateTimeRange {
+        DateTimeRange::new(start, end).unwrap()
+    }
+
+    fn assert_contiguous(buckets: &[DateTimeRange]) {
+        for i in 0..buckets.len() - 1 {
+            assert_eq!(
+                buckets[i].end, buckets[i + 1].start,
+                "gap between bucket {i} and {}",
+                i + 1
+            );
+        }
+    }
+
+    #[test]
+    fn test_day_buckets() {
+        // Mid-day range covering parts of 4 days: first bucket aligns to midnight,
+        // last bucket extends past dtr.end
+        let dtr = range(dt(2026, 3, 2, 14, 0), dt(2026, 3, 5, 9, 0));
+        let buckets = Breakdown::Day.buckets(&dtr);
+        assert_eq!(buckets.len(), 4);
+        assert_eq!(buckets[0].start, dt(2026, 3, 2, 0, 0));
+        assert_eq!(buckets[0].end, dt(2026, 3, 3, 0, 0));
+        assert_eq!(buckets[3].start, dt(2026, 3, 5, 0, 0));
+        assert_eq!(buckets[3].end, dt(2026, 3, 6, 0, 0));
+        assert!(buckets[0].start <= dtr.start);
+        assert!(buckets.last().unwrap().end >= dtr.end);
+        assert_contiguous(&buckets);
+
+        // Exact 2-day range: no overhang at either end
+        let dtr = range(dt(2026, 3, 2, 0, 0), dt(2026, 3, 4, 0, 0));
+        let buckets = Breakdown::Day.buckets(&dtr);
+        assert_eq!(buckets.len(), 2);
+        assert_eq!(buckets[0].start, dt(2026, 3, 2, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 3, 4, 0, 0));
+        assert_contiguous(&buckets);
+    }
+
+    #[test]
+    fn test_week_buckets() {
+        // Mid-week start (Wednesday): first bucket aligns to Monday, spans 3 weeks
+        let dtr = range(dt(2026, 3, 4, 9, 0), dt(2026, 3, 18, 9, 0));
+        let buckets = Breakdown::Week.buckets(&dtr);
+        assert_eq!(buckets.len(), 3);
+        assert_eq!(buckets[0].start, dt(2026, 3, 2, 0, 0)); // Monday
+        assert_eq!(buckets[0].end, dt(2026, 3, 9, 0, 0));
+        assert_eq!(buckets[1].start, dt(2026, 3, 9, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 3, 16, 0, 0));
+        assert_eq!(buckets[2].start, dt(2026, 3, 16, 0, 0));
+        assert_eq!(buckets[2].end, dt(2026, 3, 23, 0, 0));
+        assert!(buckets[0].start <= dtr.start);
+        assert!(buckets.last().unwrap().end >= dtr.end);
+        assert_contiguous(&buckets);
+
+        // Year-boundary crossing: week starting Dec 29 spans into January
+        let dtr = range(dt(2025, 12, 29, 0, 0), dt(2026, 1, 6, 12, 0));
+        let buckets = Breakdown::Week.buckets(&dtr);
+        assert_eq!(buckets.len(), 2);
+        assert_eq!(buckets[0].start, dt(2025, 12, 29, 0, 0));
+        assert_eq!(buckets[0].end, dt(2026, 1, 5, 0, 0));
+        assert_eq!(buckets[1].start, dt(2026, 1, 5, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 1, 12, 0, 0));
+        assert_contiguous(&buckets);
+    }
+
+    #[test]
+    fn test_month_buckets() {
+        // Mid-month start spanning 3 months: first bucket aligns to Jan 1
+        let dtr = range(dt(2026, 1, 15, 9, 0), dt(2026, 3, 10, 17, 0));
+        let buckets = Breakdown::Month.buckets(&dtr);
+        assert_eq!(buckets.len(), 3);
+        assert_eq!(buckets[0].start, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[0].end, dt(2026, 2, 1, 0, 0));
+        assert_eq!(buckets[1].start, dt(2026, 2, 1, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 3, 1, 0, 0));
+        assert_eq!(buckets[2].start, dt(2026, 3, 1, 0, 0));
+        assert_eq!(buckets[2].end, dt(2026, 4, 1, 0, 0));
+        assert!(buckets[0].start <= dtr.start);
+        assert!(buckets.last().unwrap().end >= dtr.end);
+        assert_contiguous(&buckets);
+
+        // December → January wrap: dtr.end lands exactly on last bucket's end
+        let dtr = range(dt(2025, 11, 1, 0, 0), dt(2026, 2, 1, 0, 0));
+        let buckets = Breakdown::Month.buckets(&dtr);
+        assert_eq!(buckets.len(), 3);
+        assert_eq!(buckets[0].start, dt(2025, 11, 1, 0, 0));
+        assert_eq!(buckets[0].end, dt(2025, 12, 1, 0, 0));
+        assert_eq!(buckets[1].start, dt(2025, 12, 1, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[2].start, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[2].end, dt(2026, 2, 1, 0, 0));
+        assert_contiguous(&buckets);
+    }
+
+    #[test]
+    fn test_quarter_buckets() {
+        // Mid-quarter start: first bucket aligns to Q1 start, dtr.end on exact boundary
+        let dtr = range(dt(2026, 1, 15, 0, 0), dt(2026, 7, 1, 0, 0));
+        let buckets = Breakdown::Quarter.buckets(&dtr);
+        assert_eq!(buckets.len(), 2);
+        assert_eq!(buckets[0].start, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[0].end, dt(2026, 4, 1, 0, 0));
+        assert_eq!(buckets[1].start, dt(2026, 4, 1, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 7, 1, 0, 0));
+        assert!(buckets[0].start <= dtr.start);
+        assert_contiguous(&buckets);
+
+        // Q4 → Q1 year wrap spanning 3 quarters
+        let dtr = range(dt(2025, 10, 1, 0, 0), dt(2026, 4, 15, 0, 0));
+        let buckets = Breakdown::Quarter.buckets(&dtr);
+        assert_eq!(buckets.len(), 3);
+        assert_eq!(buckets[0].start, dt(2025, 10, 1, 0, 0));
+        assert_eq!(buckets[0].end, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[1].start, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 4, 1, 0, 0));
+        assert_eq!(buckets[2].start, dt(2026, 4, 1, 0, 0));
+        assert_eq!(buckets[2].end, dt(2026, 7, 1, 0, 0));
+        assert!(buckets.last().unwrap().end >= dtr.end);
+        assert_contiguous(&buckets);
+    }
+
+    #[test]
+    fn test_year_buckets() {
+        // Mid-year start spanning 3 years: first bucket aligns to Jan 1 of start year
+        let dtr = range(dt(2024, 6, 1, 0, 0), dt(2026, 9, 1, 0, 0));
+        let buckets = Breakdown::Year.buckets(&dtr);
+        assert_eq!(buckets.len(), 3);
+        assert_eq!(buckets[0].start, dt(2024, 1, 1, 0, 0));
+        assert_eq!(buckets[0].end, dt(2025, 1, 1, 0, 0));
+        assert_eq!(buckets[1].start, dt(2025, 1, 1, 0, 0));
+        assert_eq!(buckets[1].end, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[2].start, dt(2026, 1, 1, 0, 0));
+        assert_eq!(buckets[2].end, dt(2027, 1, 1, 0, 0));
+        assert!(buckets[0].start <= dtr.start);
+        assert!(buckets.last().unwrap().end >= dtr.end);
+        assert_contiguous(&buckets);
+
+        // Exact 2-year range: no overhang
+        let dtr = range(dt(2025, 1, 1, 0, 0), dt(2027, 1, 1, 0, 0));
+        let buckets = Breakdown::Year.buckets(&dtr);
+        assert_eq!(buckets.len(), 2);
+        assert_eq!(buckets[0].start, dt(2025, 1, 1, 0, 0));
+        assert_eq!(buckets[1].end, dt(2027, 1, 1, 0, 0));
+        assert_contiguous(&buckets);
+    }
+}
