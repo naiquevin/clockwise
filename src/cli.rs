@@ -10,6 +10,7 @@ use crate::{
     breakdown::{Breakdown, bucket_label},
     datetime_util::secs_to_rounded_hours_mins,
     error::Error,
+    heatmap::print_heatmap,
     org_parser::parse_org_clock_entries,
     time_duration::parse_time_duration,
 };
@@ -22,6 +23,8 @@ pub struct Cli {
     time_duration: String,
     #[arg(short, long, value_enum)]
     breakdown: Option<Breakdown>,
+    #[arg(long)]
+    heatmap: bool,
 }
 
 impl Cli {
@@ -43,6 +46,12 @@ impl Cli {
             .collect::<Result<Vec<String>, std::io::Error>>()?;
         let entries = parse_org_clock_entries(lines);
 
+        if self.heatmap {
+            println!("{}", "-".repeat(30));
+            print_heatmap(&entries, &time_duration);
+        }
+
+        println!("{}", "-".repeat(30));
         println!(
             "From {} to {}",
             time_duration.start.format("%Y-%m-%d"),

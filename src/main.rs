@@ -2,6 +2,7 @@ mod breakdown;
 mod cli;
 mod datetime_util;
 mod error;
+mod heatmap;
 mod org_parser;
 mod time_duration;
 
