@@ -51,3 +51,4 @@ cargo clippy               # Lint
 - Refactor into a new module only when a piece of code grows to have significant complexity; don't preemptively split
 - Prefer `assert!` / `assert_eq!` in production code when there's no sensible way to handle an error
 - Tests live inline in each module under `#[cfg(test)]`
+- Group related assertions into one test function rather than one function per assertion; use comments to describe what each assertion checks
