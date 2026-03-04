@@ -78,6 +78,9 @@
    - If the breakdown is larger than the duration, it disregards the
      breakdown and show the output (as if breakdown was not specified) but
      show a warning
+** Heatmap
+   - The ~--heatmap~ option displays a github-like calendar heatmap
+     for the selected time duration
 
 * Examples
   #+begin_src bash
@@ -95,5 +98,6 @@
   #+end_src
 
 * Improvements for future (no need to implement right now)
+  - Multiple files as input
   - Multiple output formats
   - Filtering of org entries by tags etc.

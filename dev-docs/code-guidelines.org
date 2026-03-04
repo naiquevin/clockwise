@@ -22,7 +22,7 @@
     assistants must also read if when required.
   - One common workflow is to write a dev-doc and ask the coding
     assistant to treat it like a prompt. Once the task is performed,
-    modify the dev doc to make it sound more like a doc or a spec
+    modify the dev doc to make it read more like a doc or a spec
     instead of a prompt.
 
 * Use date time without timezone for org mode timestamps
